@@ -219,11 +219,62 @@ subset2 %>%
 
 
 ```
+process time
+average processing time group by requesttype
+```{r}
+str(data$UpdatedDate)
+data$CreatedDate=mdy_hms(data$CreatedDate)
+data$UpdatedDate=mdy_hms(data$UpdatedDate)
+data$ProcessDate = difftime(data$UpdatedDate,data$CreatedDate,units = c("hours"))
+data$ProcessDate=as.integer(data$ProcessDate)
+
+data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+  group_by(RequestType)%>%
+  summarise(avg = mean(ProcessDate)) %>%
+  ggplot(aes(x = RequestType, y = avg,fill= avg >200))+
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("lightblue","red"), guide =F)+
+  geom_text(aes(label = as.integer(avg)),hjust =0.6,)+
+  theme(axis.text.x=element_text(angle = 45,vjust = 1, hjust=1))+
+  ylab("Average Processing Time (hours)")+
+  ggtitle("")
+```
+
+average processing time group by owner
+
+```{r}
+data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+  group_by(Owner)%>%
+  summarise(avg = mean(ProcessDate)) %>%
+  ggplot(aes(x = Owner, y = avg))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x=element_text(angle = 45,vjust = 1, hjust=1))+
+  geom_text(aes(label = as.integer(avg)),hjust =0.6,)+
+  ylab("Average Processing Time (hours)")+
+  ggtitle("")
+```
+overall call map
+```{r}
+LA = qmap("Los Angeles", zoom = 14, maptype = "roadmap", color="bw")
+LA +
+  stat_density2d(data = subset(data,data$Latitude != ""),
+                 aes(x = Longitude, y = Latitude , fill = ..level..),
+                 geom = "polygon", alpha = 0.2)+
+  scale_fill_gradient(low = "white", high = "darkred" )
+```
 
 
-
-
-
+```{r}
+data_finished=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed")
+LA +
+  stat_density2d(data = subset(data_finished,data_finished$Latitude != ""),
+                 aes(x = Longitude, y = Latitude , fill = ..level..),
+                 geom = "polygon", alpha = 0.2)+
+  scale_fill_gradient(low = "white", high = "darkred" )
+```
 
 
 
