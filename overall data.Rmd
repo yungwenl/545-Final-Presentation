@@ -1,0 +1,229 @@
+---
+title: "Untitled"
+author: "Lulu Zhang"
+date: "November 30, 2016"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+data = read.csv("MyLA311_Service_Request_Data_2016.csv")
+library(dplyr)
+library(ggplot2)
+library(ggmap)
+library(lubridate)
+```
+
+
+Distribution of Services
+```{r}
+service_type = data %>%
+  filter(Status !="Cancelled") %>%
+  group_by(RequestType) %>%
+  summarise(frequency= n())
+  
+service_type$top3 = service_type$frequency > 70000
+
+  
+ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/1000, fill = top3)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Distribution of Services Type (in thousands)") +
+  coord_flip() +
+  scale_y_continuous(limits = c(0,540),
+    labels = seq(0,540,100),
+                     breaks = seq(0,540,100)) +
+  xlab("Service") +
+  ylab("Frequency") +
+  geom_text(aes(label = frequency/1000), hjust = -0.2) +
+  scale_fill_manual(values = c("darkblue","red"), guide =F)
+
+
+
+```
+
+
+Distribution of Departments
+```{r}
+depart = data %>%
+  filter(Status !="Cancelled" & Owner !="") %>%
+  group_by(Owner) %>%
+  summarise(count = n())
+
+depart$top3 = depart$count > 20000
+
+ggplot(data= depart,aes(x= reorder(Owner,-count), y =count/1000, fill = top3)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Distribution of Departments Referred to (in thousands)")+
+  coord_flip() +
+  scale_y_continuous(limits = c(0,770),
+                     labels = seq(0,770,100),
+                     breaks = seq(0,770,100)) +
+  xlab("Department") +
+  ylab("Frequency") +
+  geom_text(aes(label = count/1000), hjust = -0.2) +
+  scale_fill_manual(values = c("darkblue","red"), guide =F)
+```
+
+
+
+App vs Phone call referrals, service type question for each input channel
+```{r}
+input_channel = data %>%
+  filter(Status !="Cancelled") %>%
+  group_by( RequestSource) %>%
+  summarize(frequency = n())
+
+ggplot(input_channel, aes(x= RequestSource, y = frequency/1000))+
+  geom_bar(stat = "identity") +
+  coord_flip()+
+  geom_text(aes(label=frequency),hjust = -0.1)
+
+data %>%
+  filter(Status !="Cancelled") %>%
+  group_by(RequestType, RequestSource) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= RequestType,y= frequency)) +
+  geom_bar(stat ="identity") +
+  facet_wrap((~RequestSource))
+
+
+data %>%
+  filter(RequestSource == "Call" & Status !="Cancelled") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  geom_bar(stat ="identity")+
+  coord_flip()+
+  ggtitle("Services Requested by Call")
+
+data %>%
+  filter(RequestSource == "Driver Self Report" & Status !="Cancelled") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  geom_bar(stat ="identity")+
+  coord_flip()+
+  ggtitle("Services Requested by Driver Self Report")
+
+data %>%
+  filter(RequestSource == "Mobile App" & Status !="Cancelled") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  geom_bar(stat ="identity")+
+  coord_flip()+
+  ggtitle("Services Requested by Mobile App")
+
+
+data %>%
+  filter(RequestSource == "Self Service" & Status !="Cancelled") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  geom_bar(stat ="identity")+
+  coord_flip()+
+  ggtitle("Services Requested by Self Service")
+
+
+data %>%
+  filter(RequestSource == "Email" & Status !="Cancelled") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  geom_bar(stat ="identity")+
+  coord_flip()+
+  ggtitle("Services Requested by Email")
+
+
+subset1 =data %>% 
+   filter(RequestType %in% 
+            c("Bulky Items",
+              "Metal/Household Appliances",
+              "Illegal Dumping Pickup",
+              "Single Streetlight Issue",
+              "Graffiti Removal") &
+          RequestSource %in% 
+            c("Call",
+              "Email",
+              "Driver Self Report",
+              "Self Service",
+              "Mobile App") &
+          Status != "Cancelled") %>%
+  group_by(RequestType,RequestSource) %>%
+  summarize(frequency=n())
+
+ggplot(subset1, aes(x= RequestType, y = frequency/1000, fill = RequestSource))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  ggtitle("TOP5 Seriveces by Top5 Input Channel")+
+  theme_light()
+
+
+
+
+
+
+```
+
+
+
+Timeframe distribution
+```{r}
+
+data$CreatedDate = mdy_hms(data$CreatedDate)
+
+subset2 = data %>%
+  group_by(RequestType, month = month(CreatedDate, label = T)) %>%
+  summarise(count = n())
+
+ggplot(data = subset2, aes(x = month, y = count, group =1)) +
+  geom_line(stat = "identity") +
+  facet_wrap(~RequestType,nrow = 4)
+
+
+subset2 %>%
+ggplot(aes(x = month, y = count/1000, group = RequestType, col=RequestType)) +
+  geom_line(stat = "identity") +
+  ggtitle("All Services Request by Month")
+
+
+subset2 %>%
+  filter(RequestType != "Bulky Items" & RequestType != "Graffiti Removal") %>%
+ggplot(aes(x = month, y = count, group = RequestType, col=RequestType)) +
+  geom_line(stat = "identity") +
+  ggtitle("Services Request by Month (no Bulky Items & Graffiti Removal)")
+
+
+subset2 %>%
+  filter(RequestType != "Bulky Items" & RequestType != "Graffiti Removal"& RequestType != "Illegal Dumping Pickup"& RequestType != "Metal/Household Appliances"& RequestType != "Electronic Waste"& RequestType != "Dead Animal Removal") %>%
+ggplot(aes(x = month, y = count, group = RequestType, col=RequestType)) +
+  geom_line(stat = "identity") +
+  ggtitle("Services Request by Month (count <2200)")
+
+
+subset2 %>%
+  filter(RequestType =="Bulky Items") %>%
+  ggplot(aes(x = month, y = count, group =1)) +
+  geom_line(stat = "identity") +
+  ggtitle("Bulky Items Service Request by Month")
+  
+
+  ggplot(subset2, aes(x=month, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "darkgreen") +
+  ylab("hour of the day") +
+  xlab("day of the week")
+
+
+```
+
+
+
+
+
+
+
+
