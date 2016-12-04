@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
+backup=data
+data = backup
 data = read.csv("MyLA311_Service_Request_Data_2016.csv")
 library(dplyr)
 library(ggplot2)
@@ -25,22 +27,48 @@ service_type = data %>%
   filter(Status !="Cancelled") %>%
   group_by(RequestType) %>%
   summarise(frequency= n())
+
+data$CreatedDate=mdy_hms(data$CreatedDate)
+data$UpdatedDate=mdy_hms(data$UpdatedDate)
+data$ProcessDate = difftime(data$UpdatedDate,data$CreatedDate,units = c("hours"))
+
+
+process_time = data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+  group_by(RequestType)%>%
+  summarise(avg = mean(ProcessDate))
   
 service_type$top3 = service_type$frequency > 70000
 
   
-ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/1000, fill = top3)) +
+p1 = ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/1000, fill =service_type$top3)) +
   geom_bar(stat = "identity") +
-  ggtitle("Distribution of Services Type (in thousands)") +
-  coord_flip() +
   scale_y_continuous(limits = c(0,540),
     labels = seq(0,540,100),
                      breaks = seq(0,540,100)) +
-  xlab("Service") +
   ylab("Frequency") +
-  geom_text(aes(label = frequency/1000), hjust = -0.2) +
-  scale_fill_manual(values = c("darkblue","red"), guide =F)
+  geom_text(aes(label = frequency/1000), vjust = -0.2) +
+  scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)+
+  theme(axis.text.x=element_text(angle = 30,vjust = 1, hjust=1))+
+  xlab("")
 
+
+lev =levels(process_time$RequestType)
+lev=lev[c(1,5,8,7,3,2,12,6,10,9,11,4)]
+process_time$RequestType=factor(process_time$RequestType, levels =lev)
+
+
+ p2 =  ggplot(process_time,aes(x = RequestType, y = avg,group = 1))+
+  geom_line() +
+  geom_text(aes(label = as.integer(avg)),hjust =-0.6,vjust=0.9)+
+  theme(axis.text.x=element_blank())+
+  ylab("Average Processing Time (hours)")+
+   xlab("") +
+   geom_point(size =1)
+
+library(gridExtra)
+grid.arrange(p2,p1, nrow = 2,
+             top = "Services Type Frequency(thousands) vs. Processing Time(hours)") 
 
 
 ```
@@ -48,24 +76,51 @@ ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/1000, f
 
 Distribution of Departments
 ```{r}
-depart = data %>%
-  filter(Status !="Cancelled" & Owner !="") %>%
+depart = data1 %>%
+  filter(Status !="Cancelled" & Owner !="BOE") %>%
+  droplevels()%>%
   group_by(Owner) %>%
   summarise(count = n())
 
 depart$top3 = depart$count > 20000
 
-ggplot(data= depart,aes(x= reorder(Owner,-count), y =count/1000, fill = top3)) +
+p3 = ggplot(data= depart,aes(x= reorder(Owner,-count), y =count/1000, fill = top3)) +
   geom_bar(stat = "identity") +
-  ggtitle("Distribution of Departments Referred to (in thousands)")+
-  coord_flip() +
   scale_y_continuous(limits = c(0,770),
                      labels = seq(0,770,100),
                      breaks = seq(0,770,100)) +
-  xlab("Department") +
+  xlab("") +
   ylab("Frequency") +
-  geom_text(aes(label = count/1000), hjust = -0.2) +
-  scale_fill_manual(values = c("darkblue","red"), guide =F)
+  geom_text(aes(label = count/1000), vjust = -0.2) +
+  scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)
+
+
+data1= data %>% filter(Owner !="")
+
+depart_time = data1 %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+  droplevels()%>%
+  group_by(Owner)%>%
+  summarise(avg = mean(ProcessDate))
+
+
+depart_time$Owner=factor(depart_time$Owner, levels =c("BOS","OCB","BSL","ITA","BSS","LADWP"))
+
+
+p4 = 
+  ggplot(depart_time,aes(x = Owner, y = avg,group=1))+
+  geom_line()+
+  theme(axis.text.x=element_text())+
+  geom_text(aes(label = as.integer(avg)),hjust =-0.6,vjust=0.9)+
+  ylab("Average Processing Time (hours)")+
+  xlab("")+
+  geom_point(size=1,shape=3)
+
+
+grid.arrange(p4,p3, nrow = 2,
+             top = "Department Frequency(thousands) vs. Processing Time(hours)") 
+
+
 ```
 
 
@@ -277,4 +332,16 @@ LA +
 ```
 
 
+```{r}
+data %>%
+  filter(Status=="Cancelled"& RequestType=="Other") %>%
+ggplot(aes(x = Longitude, y = Latitude)) +
+  geom_point() +
+  geom_text(aes(label = RequestType), vjust = -1) +
+  coord_map() 
+  
+
+
+
+```
 
