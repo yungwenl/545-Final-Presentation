@@ -2,45 +2,43 @@
 title: "Untitled"
 author: "Lulu Zhang"
 date: "November 30, 2016"
-output: word_document
+output:
+  word_document: default
+  html_document: default
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
+#Set up data and function Data backup building
 ```{r}
-backup=data
-data = backup
-data = read.csv("MyLA311_Service_Request_Data_2016.csv")
+data=read.csv("MyLA311_Service_Request_Data_2016.csv")
+#original_backup=data
 library(dplyr)
 library(ggplot2)
 library(ggmap)
 library(lubridate)
+data$CreatedDate=mdy_hms(data$CreatedDate)
+data$UpdatedDate=mdy_hms(data$UpdatedDate)
+data$ProcessHours = round(difftime(data$UpdatedDate,data$CreatedDate,units = c("hours")),2)
+data=backup
 ```
 
-
-Distribution of Services
+#2 graphs-Distribution of Services VS Processing Time Lacy Lulu
 ```{r}
+data=backup
 service_type = data %>%
   filter(Status !="Cancelled") %>%
   group_by(RequestType) %>%
   summarise(frequency= n())
 
-data$CreatedDate=mdy_hms(data$CreatedDate)
-data$UpdatedDate=mdy_hms(data$UpdatedDate)
-data$ProcessDate = difftime(data$UpdatedDate,data$CreatedDate,units = c("hours"))
-
-
 process_time = data %>%
   filter(ActionTaken == "SR Created"& Status =="Closed") %>%
   group_by(RequestType)%>%
-  summarise(avg = mean(ProcessDate))
+  summarise(avg = mean(ProcessHours))
   
 service_type$top3 = service_type$frequency > 70000
 
-  
 p1 = ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/1000, fill =service_type$top3)) +
   geom_bar(stat = "identity") +
   scale_y_continuous(limits = c(0,540),
@@ -71,37 +69,36 @@ grid.arrange(p2,p1, nrow = 2,
              top = "Services Type Frequency(thousands) vs. Processing Time(hours)") 
 
 ```
-
-
-Distribution of Departments
+#2 graphs-Department Frequency(thousands) vs. Processing Time(hours) Lacy
 ```{r}
-depart = data1 %>%
-  filter(Status !="Cancelled" & Owner !="BOE") %>%
+data=backup
+
+depart = data %>%
+  filter(Status !="Cancelled" & Owner !="" & Owner !="BOE") %>%
   droplevels()%>%
   group_by(Owner) %>%
   summarise(count = n())
+
+#unique(depart$Owner)
 
 depart$top3 = depart$count > 20000
 
 p3 = ggplot(data= depart,aes(x= reorder(Owner,-count), y =count/1000, fill = top3)) +
   geom_bar(stat = "identity") +
-  scale_y_continuous(limits = c(0,770),
-                     labels = seq(0,770,100),
-                     breaks = seq(0,770,100)) +
+  scale_y_continuous(limits = c(0,800),
+                     labels = seq(0,800,100),
+                     breaks = seq(0,800,100)) +
   xlab("") +
   ylab("Frequency") +
   geom_text(aes(label = count/1000), vjust = -0.2) +
   scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)
 
-
-data1= data %>% filter(Owner !="")
-
-depart_time = data1 %>%
-  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+data=backup
+depart_time = data%>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & Owner !="" & Owner !="BOE") %>%
   droplevels()%>%
   group_by(Owner)%>%
-  summarise(avg = mean(ProcessDate))
-
+  summarise(avg = mean(ProcessHours))
 
 depart_time$Owner=factor(depart_time$Owner, levels =c("BOS","OCB","BSL","ITA","BSS","LADWP"))
 
@@ -119,12 +116,9 @@ p4 =
 grid.arrange(p4,p3, nrow = 2,
              top = "Department Frequency(thousands) vs. Processing Time(hours)") 
 
-
 ```
 
-
-
-App vs Phone call referrals, service type question for each input channel
+#Request Source Frequency(Thousands) Bar Chart Lulu
 ```{r}
 input_channel = data %>%
   filter(Status !="Cancelled") %>%
@@ -141,16 +135,23 @@ ggplot(input_channel, aes(x= reorder(RequestSource, frequency/1000), y = frequen
   xlab("")+
   ylab("Frequency")+
   ggtitle("Request Source (Thousands)")
+```
 
+#Summary - Service Type by Request Source Frequency(Thousands)" Summary Lulu
+```{r}
 data %>%
   filter(Status !="Cancelled") %>%
   group_by(RequestType, RequestSource) %>%
   summarize(frequency = n()) %>%
   ggplot(aes(x= RequestType,y= frequency)) +
   geom_bar(stat ="identity") +
-  facet_wrap((~RequestSource))
+  facet_wrap((~RequestSource))+
+  xlab("Service Type")+
+  ggtitle("Service Type by Request Source Summary")
+```
 
-
+#Service Type Frequency(Thousands) by Call  Lulu
+```{r}
 data %>%
   filter(RequestSource == "Call" & Status !="Cancelled") %>%
   group_by(RequestType) %>%
@@ -160,47 +161,67 @@ data %>%
   coord_flip()+
   ggtitle("Services Requested by Call(Thousands) ")+
   xlab("")+
-  ylab("Frequency")
+  ylab("Frequency (Thousands)")
+```
 
+#Service Type Frequency(Thousands) by  Driver Self Report  Lulu
+```{r}
 data %>%
   filter(RequestSource == "Driver Self Report" & Status !="Cancelled") %>%
   group_by(RequestType) %>%
   summarize(frequency = n()) %>%
-  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  ggplot(aes(x= reorder(RequestType,frequency/1000),y= frequency/1000)) +
   geom_bar(stat ="identity")+
   coord_flip()+
-  ggtitle("Services Requested by Driver Self Report")
+  ggtitle("Services Requested by Driver Self Report ")+
+  xlab("Driver Self Report")+
+  ylab("Frequency (Thousands)")
+```
 
+#Service Type Frequency(Thousands) by Mobile App Request  Lulu
+```{r}
 data %>%
   filter(RequestSource == "Mobile App" & Status !="Cancelled") %>%
   group_by(RequestType) %>%
   summarize(frequency = n()) %>%
-  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  ggplot(aes(x= reorder(RequestType,frequency/1000),y= frequency/1000)) +
   geom_bar(stat ="identity")+
   coord_flip()+
-  ggtitle("Services Requested by Mobile App")
+  ggtitle("Services Requested by Mobile App")+
+  xlab("Mobile App Request")+
+  ylab("Frequency (Thousands)")
+```
 
-
+#Service Type Frequency(Thousands) by Self Service  Lulu
+```{r}
 data %>%
   filter(RequestSource == "Self Service" & Status !="Cancelled") %>%
   group_by(RequestType) %>%
   summarize(frequency = n()) %>%
-  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  ggplot(aes(x= reorder(RequestType,frequency/1000),y= frequency/1000)) +
   geom_bar(stat ="identity")+
   coord_flip()+
-  ggtitle("Services Requested by Self Service")
+  ggtitle("Services Requested by Self Service")+
+  xlab("Self Service")+
+  ylab("Frequency (Thousands)")
+```
 
-
+#Service Type Frequency(Thousands) by Email Request  Lulu
+```{r}
 data %>%
   filter(RequestSource == "Email" & Status !="Cancelled") %>%
   group_by(RequestType) %>%
   summarize(frequency = n()) %>%
-  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  ggplot(aes(x= reorder(RequestType,frequency/1000),y= frequency/1000)) +
   geom_bar(stat ="identity")+
   coord_flip()+
-  ggtitle("Services Requested by Email")
+  ggtitle("Services Requested by Email")+
+  ylab("Frequency (Thousands)")+
+  xlab("Email Request")
+```
 
-
+#TOP5 Seriveces by Top5 Input Channel(Fancy Bar) Lulu
+```{r}
 subset1 =data %>% 
    filter(RequestType %in% 
             c("Bulky Items",
@@ -220,22 +241,16 @@ subset1 =data %>%
 
 ggplot(subset1, aes(x= RequestType, y = frequency/1000, fill = RequestSource))+
   geom_bar(position = position_dodge(0.9), stat = "Identity") +
-  ggtitle("TOP5 Seriveces by Top5 Input Channel")+
-  theme_light()
-
-
-
-
-
-
+  theme(axis.text.x=element_text(angle = 15,vjust = 1, hjust=1))+
+  ggtitle("Top5 Seriveces by Top5 Request Sources")+
+  ylab("Frequency")+
+  xlab("")
+  #+theme_light()
 ```
 
-
-
-Timeframe distribution
+#Summary-Service Type by Month Frequency Summary (Many LineGraphs) Lulu
 ```{r}
-
-data$CreatedDate = mdy_hms(data$CreatedDate)
+data=backup
 
 subset2 = data %>%
   group_by(RequestType, month = month(CreatedDate, label = T)) %>%
@@ -243,94 +258,104 @@ subset2 = data %>%
 
 ggplot(data = subset2, aes(x = month, y = count, group =1)) +
   geom_line(stat = "identity") +
-  facet_wrap(~RequestType,nrow = 4)
+  facet_wrap(~RequestType,nrow = 4)+
+  ggtitle("All Service Types by Month (Frequency)")+
+  ylab("Frequecy (Thousands)")
+```
 
-
+#Summary-Service Types by Month Frequency Summary (One LineGraph) Lulu
+```{r}
 subset2 %>%
 ggplot(aes(x = month, y = count/1000, group = RequestType, col=RequestType)) +
   geom_line(stat = "identity") +
-  ggtitle("All Services Request by Month")
+  ggtitle("All Services Request by Month")+
+  ylab("Frequecy (Thousands)")
+```
 
-
+#Service Types by Month Frequency Summary without Bulky Items & Graffiti Removal (One LineGraph) Lulu
+```{r}
 subset2 %>%
   filter(RequestType != "Bulky Items" & RequestType != "Graffiti Removal") %>%
 ggplot(aes(x = month, y = count, group = RequestType, col=RequestType)) +
   geom_line(stat = "identity") +
   ggtitle("Services Request by Month (no Bulky Items & Graffiti Removal)")
+```
 
-
+#Service Types by Month Frequency<2000 Summary (without Bulky Items ,Graffiti Removal,Illegal Dumping Pickup,Metal/Household Appliances) (One LineGraph) Lulu
+```{r}
 subset2 %>%
   filter(RequestType != "Bulky Items" & RequestType != "Graffiti Removal"& RequestType != "Illegal Dumping Pickup"& RequestType != "Metal/Household Appliances"& RequestType != "Electronic Waste"& RequestType != "Dead Animal Removal") %>%
 ggplot(aes(x = month, y = count, group = RequestType, col=RequestType)) +
   geom_line(stat = "identity") +
   ggtitle("Services Request by Month (count <2200)")
+```
 
-
+#Bulky Items Request by Month (Frequency) Lulu
+```{r}
 subset2 %>%
   filter(RequestType =="Bulky Items") %>%
   ggplot(aes(x = month, y = count, group =1)) +
   geom_line(stat = "identity") +
   ggtitle("Bulky Items Service Request by Month")
-  
+```  
 
+#Service Types by Month Frequency Summary (HeatMap) Lulu
+```{r}
   ggplot(subset2, aes(x=month, y = RequestType, fill = count))+
   geom_tile() +
   scale_fill_gradient(low = "white", high = "darkgreen") +
-  ylab("hour of the day") +
-  xlab("day of the week")
-
+  ylab("Service Type") +
+  xlab("Month")
 
 ```
-process time
-average processing time group by requesttype
-```{r}
-str(data$UpdatedDate)
-data$CreatedDate=mdy_hms(data$CreatedDate)
-data$UpdatedDate=mdy_hms(data$UpdatedDate)
-data$ProcessDate = difftime(data$UpdatedDate,data$CreatedDate,units = c("hours"))
-data$ProcessDate=as.integer(data$ProcessDate)
 
-data %>%
+#Average Processing Hrs by RequestType (Bar) Lacy
+```{r}
+data=backup
+data%>%
   filter(ActionTaken == "SR Created"& Status =="Closed") %>%
   group_by(RequestType)%>%
-  summarise(avg = mean(ProcessDate)) %>%
-  ggplot(aes(x = RequestType, y = avg,fill= avg >200))+
+  summarise(avg = mean(ProcessHours))%>%
+  ggplot(aes(x = reorder(RequestType,-avg), y = avg,fill= avg >200))+
   geom_bar(stat = "identity") +
   scale_fill_manual(values = c("lightblue","red"), guide =F)+
   geom_text(aes(label = as.integer(avg)),hjust =0.6)+
   theme(axis.text.x=element_text(angle = 45,vjust = 1, hjust=1))+
   ylab("Average Processing Time (hours)")+
-  ggtitle("")
+  xlab("")+
+  ggtitle("Average Processing Hours vs Service Type")
 ```
 
-average processing time group by owner
-
+#Average processing Hrs by Owner(Department) (Bar) Lacy
 ```{r}
+data=backup
 data %>%
   filter(ActionTaken == "SR Created"& Status =="Closed") %>%
   group_by(Owner)%>%
-  summarise(avg = mean(ProcessDate)) %>%
-  ggplot(aes(x = Owner, y = avg))+
+  summarise(avg = mean(ProcessHours)) %>%
+  ggplot(aes(x = reorder(Owner,-avg), y = avg))+
   geom_bar(stat = "identity")+
-  theme(axis.text.x=element_text(angle = 45,vjust = 1, hjust=1))+
+  #theme(axis.text.x=element_text(angle = 45,vjust = 1, hjust=1))+
   geom_text(aes(label = as.integer(avg)),hjust =0.6)+
+  xlab("")+
   ylab("Average Processing Time (hours)")+
-  ggtitle("")
+  ggtitle("Average Processing Hours vs Department")
 ```
-overall call map
+
+#Overall call freqency (Map) Lacy
 ```{r}
 LA = qmap("Los Angeles", zoom = 14, maptype = "roadmap", color="bw")
 LA +
   stat_density2d(data = subset(data,data$Latitude != ""),
                  aes(x = Longitude, y = Latitude , fill = ..level..),
                  geom = "polygon", alpha = 0.2)+
-  scale_fill_gradient(low = "white", high = "darkred" )
+  scale_fill_gradient(low = "white", high = "darkred" )+
+  ggtitle("Calls Frequency Map")
 ```
 
-
-#Successful Rate by Service Type
+#Successful Rate by Service Type (Point graph) Emily
 ```{r}
-unique(data$RequestType)
+#unique(data$RequestType)
 
 ServiceTypetotal=
   data %>%
@@ -359,9 +384,9 @@ Other = data %>%
 #str_locate(data$RequestType =="Feedback")
 ```
 
-#Successful Rate by department(Owner)
+#Successful Rate by Department(Owner) (Point graph) Emily
 ```{r}
-unique(data$Owner)
+#unique(data$Owner)
 
 Ownertotal=
   data %>%
@@ -369,34 +394,23 @@ Ownertotal=
   group_by(Owner) %>%
   summarise(total=n())
 
-#unique(Owner$Owner)
-
-'''{r}
-data %>%
-  filter(Status=="Cancelled"& RequestType=="Other") %>%
-ggplot(aes(x = Longitude, y = Latitude)) +
-  geom_point() +
-  geom_text(aes(label = RequestType), vjust = -1) +
-  coord_map() 
-  
 Owner = data %>%
   filter(ActionTaken=="SR Created" & Status=="Closed") %>%
   group_by(Owner)%>%
   summarise(deliver = n())%>%
   mutate(total=Ownertotal$total)%>%
-  mutate(DeliverRate= count/total*100)
+  mutate(DeliverRate= deliver/total*100)
 
 Owner%>%
   ggplot(aes(x=DeliverRate, y= reorder(Owner,DeliverRate)))+
   geom_point(color="indianred1", size=4)+
   xlab("Successful Delivery Rate %")+
   ylab("Department")+
-  ggtitle("Successful Rate break down by Deparment")+
-  theme_light()
+  ggtitle("Successful Rate break down by Deparment")
+ #+theme_light()
 ```
 
-
-#Successful Rate by Request Source
+#Successful Rate by Request Source (Point graph) Emily
 ```{r}
 RequestSourceTotal=
   data %>%
@@ -405,14 +419,14 @@ RequestSourceTotal=
   summarise(total=n())%>%
   filter(total>17)
 
-unique(RequestSourceTotal)
+#unique(RequestSourceTotal)
 
 RequestSource = data %>%
   filter(ActionTaken=="SR Created" & Status=="Closed") %>%
   group_by(RequestSource)%>%
   summarise(deliver = n())%>%
   filter(deliver>17)%>%
-  mutate(total=RequestSourceTotal$total)%>%S
+  mutate(total=RequestSourceTotal$total)%>%
   mutate(DeliverRate= deliver/total*100)
 
 RequestSource%>%
@@ -422,6 +436,17 @@ RequestSource%>%
   ylab("Request Source")+
   ggtitle("Successful Rate break down by Request Source")
 ```
+
+#Lulu's Map (in process)
+```{r}
+data %>%
+  filter(Status=="Cancelled"& RequestType=="Other") %>%
+  ggplot(aes(x = Longitude, y = Latitude)) +
+  geom_point() +
+  geom_text(aes(label = RequestType), vjust = -1) +
+  coord_map() 
+```
+
 
 
 
