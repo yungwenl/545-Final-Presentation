@@ -47,6 +47,7 @@ p1 = ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/10
     labels = seq(0,540,100),
                      breaks = seq(0,540,100)) +
   ylab("Frequency") +
+<<<<<<< HEAD
   geom_text(aes(label = frequency/1000), vjust = -0.2) +
   scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)+
   theme(axis.text.x=element_text(angle = 30,vjust = 1, hjust=1))+
@@ -70,6 +71,8 @@ library(gridExtra)
 grid.arrange(p2,p1, nrow = 2,
              top = "Services Type Frequency(thousands) vs. Processing Time(hours)") 
 
+
+=======
 
 ```
 
@@ -129,13 +132,19 @@ App vs Phone call referrals, service type question for each input channel
 ```{r}
 input_channel = data %>%
   filter(Status !="Cancelled") %>%
-  group_by( RequestSource) %>%
+  group_by(RequestSource) %>%
   summarize(frequency = n())
 
-ggplot(input_channel, aes(x= RequestSource, y = frequency/1000))+
+ggplot(input_channel, aes(x= reorder(RequestSource, frequency/1000), y = frequency/1000))+
   geom_bar(stat = "identity") +
   coord_flip()+
-  geom_text(aes(label=frequency),hjust = -0.1)
+  geom_text(aes(label=frequency),hjust = -0.1)+
+  scale_y_continuous(limits = c(0,680),
+                     labels = seq(0,680,100),
+                     breaks = seq(0,680,100)) +
+  xlab("")+
+  ylab("Frequency")+
+  ggtitle("Request Source (Thousands)")
 
 data %>%
   filter(Status !="Cancelled") %>%
@@ -150,10 +159,12 @@ data %>%
   filter(RequestSource == "Call" & Status !="Cancelled") %>%
   group_by(RequestType) %>%
   summarize(frequency = n()) %>%
-  ggplot(aes(x= RequestType,y= frequency/1000)) +
+  ggplot(aes(x= reorder(RequestType,frequency/1000),y=frequency/1000)) +
   geom_bar(stat ="identity")+
   coord_flip()+
-  ggtitle("Services Requested by Call")
+  ggtitle("Services Requested by Call(Thousands) ")+
+  xlab("")+
+  ylab("Frequency")
 
 data %>%
   filter(RequestSource == "Driver Self Report" & Status !="Cancelled") %>%
@@ -321,17 +332,50 @@ LA +
 ```
 
 
+#Successful Rate by Service Type
 ```{r}
-data_finished=data %>%
-  filter(ActionTaken == "SR Created"& Status =="Closed")
-LA +
-  stat_density2d(data = subset(data_finished,data_finished$Latitude != ""),
-                 aes(x = Longitude, y = Latitude , fill = ..level..),
-                 geom = "polygon", alpha = 0.2)+
-  scale_fill_gradient(low = "white", high = "darkred" )
+unique(data$RequestType)
+
+ServiceTypetotal=
+  data %>%
+  group_by(RequestType) %>%
+  summarise(total=n())
+
+ServiceType = data %>%
+  filter(ActionTaken=="SR Created" & Status=="Closed") %>%
+  group_by(RequestType)%>%
+  summarise(count = n())%>%
+  mutate(total=ServiceTypetotal$total)%>%
+  mutate(DeliverRate= count/total*100)
+
+ServiceType%>%
+  ggplot(aes(x=DeliverRate, y= reorder(RequestType,DeliverRate)))+
+  geom_point()+
+  xlab("Successful Delivery Rate %")+
+  ylab("Service Type")+
+  ggtitle("Successful Rate break down by Service Type")
+
+Feedback = data %>%
+  filter(RequestType=="Feedback")
+Other = data %>%
+  filter(RequestType=="Other")
+
+#str_locate(data$RequestType =="Feedback")
 ```
 
+#Successful Rate by department(Owner)
+```{r}
+unique(data$Owner)
 
+Ownertotal=
+  data %>%
+  filter(Owner!="" & Owner!="BOE") %>%
+  group_by(Owner) %>%
+  summarise(total=n())
+
+#unique(Owner$Owner)
+
+<<<<<<< HEAD
 ```{r}
 data %>%
   filter(Status=="Cancelled"& RequestType=="Other") %>%
@@ -343,5 +387,52 @@ ggplot(aes(x = Longitude, y = Latitude)) +
 
 
 
+=======
+Owner = data %>%
+  filter(ActionTaken=="SR Created" & Status=="Closed") %>%
+  group_by(Owner)%>%
+  summarise(deliver = n())%>%
+  mutate(total=Ownertotal$total)%>%
+  mutate(DeliverRate= count/total*100)
+
+Owner%>%
+  ggplot(aes(x=DeliverRate, y= reorder(Owner,DeliverRate)))+
+  geom_point(color="indianred1", size=4)+
+  xlab("Successful Delivery Rate %")+
+  ylab("Department")+
+  ggtitle("Successful Rate break down by Deparment")+
+  theme_light()
+>>>>>>> 91aad8b01501fefacd7d81135a2c9a7411407ba4
 ```
+
+
+#Successful Rate by Request Source
+```{r}
+RequestSourceTotal=
+  data %>%
+  #filter(RequestSource!="" & Owner!="BOE") %>%
+  group_by(RequestSource) %>%
+  summarise(total=n())%>%
+  filter(total>17)
+
+unique(RequestSourceTotal)
+
+RequestSource = data %>%
+  filter(ActionTaken=="SR Created" & Status=="Closed") %>%
+  group_by(RequestSource)%>%
+  summarise(deliver = n())%>%
+  filter(deliver>17)%>%
+  mutate(total=RequestSourceTotal$total)%>%S
+  mutate(DeliverRate= deliver/total*100)
+
+RequestSource%>%
+  ggplot(aes(x=DeliverRate, y= reorder(RequestSource,DeliverRate)))+
+  geom_point(color="blue", size=2)+
+  xlab("Successful Delivery Rate %")+
+  ylab("Request Source")+
+  ggtitle("Successful Rate break down by Request Source")
+```
+
+
+
 
