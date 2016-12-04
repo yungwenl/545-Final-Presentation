@@ -47,7 +47,6 @@ p1 = ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/10
     labels = seq(0,540,100),
                      breaks = seq(0,540,100)) +
   ylab("Frequency") +
-<<<<<<< HEAD
   geom_text(aes(label = frequency/1000), vjust = -0.2) +
   scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)+
   theme(axis.text.x=element_text(angle = 30,vjust = 1, hjust=1))+
@@ -70,9 +69,6 @@ process_time$RequestType=factor(process_time$RequestType, levels =lev)
 library(gridExtra)
 grid.arrange(p2,p1, nrow = 2,
              top = "Services Type Frequency(thousands) vs. Processing Time(hours)") 
-
-
-=======
 
 ```
 
@@ -301,7 +297,7 @@ data %>%
   ggplot(aes(x = RequestType, y = avg,fill= avg >200))+
   geom_bar(stat = "identity") +
   scale_fill_manual(values = c("lightblue","red"), guide =F)+
-  geom_text(aes(label = as.integer(avg)),hjust =0.6,)+
+  geom_text(aes(label = as.integer(avg)),hjust =0.6)+
   theme(axis.text.x=element_text(angle = 45,vjust = 1, hjust=1))+
   ylab("Average Processing Time (hours)")+
   ggtitle("")
@@ -317,7 +313,7 @@ data %>%
   ggplot(aes(x = Owner, y = avg))+
   geom_bar(stat = "identity")+
   theme(axis.text.x=element_text(angle = 45,vjust = 1, hjust=1))+
-  geom_text(aes(label = as.integer(avg)),hjust =0.6,)+
+  geom_text(aes(label = as.integer(avg)),hjust =0.6)+
   ylab("Average Processing Time (hours)")+
   ggtitle("")
 ```
@@ -375,8 +371,7 @@ Ownertotal=
 
 #unique(Owner$Owner)
 
-<<<<<<< HEAD
-```{r}
+'''{r}
 data %>%
   filter(Status=="Cancelled"& RequestType=="Other") %>%
 ggplot(aes(x = Longitude, y = Latitude)) +
@@ -384,10 +379,6 @@ ggplot(aes(x = Longitude, y = Latitude)) +
   geom_text(aes(label = RequestType), vjust = -1) +
   coord_map() 
   
-
-
-
-=======
 Owner = data %>%
   filter(ActionTaken=="SR Created" & Status=="Closed") %>%
   group_by(Owner)%>%
@@ -402,7 +393,6 @@ Owner%>%
   ylab("Department")+
   ggtitle("Successful Rate break down by Deparment")+
   theme_light()
->>>>>>> 91aad8b01501fefacd7d81135a2c9a7411407ba4
 ```
 
 
