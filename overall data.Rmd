@@ -94,7 +94,7 @@ p3 = ggplot(data= depart,aes(x= reorder(Owner,-count), y =count/1000, fill = top
   geom_text(aes(label = count/1000), vjust = -0.2) +
   scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)
 
-data=backup
+
 depart_time = data%>%
   filter(ActionTaken == "SR Created"& Status =="Closed" & Owner !="" & Owner !="BOE") %>%
   droplevels()%>%
@@ -107,7 +107,7 @@ depart_time$Owner=factor(depart_time$Owner, levels =c("BOS","OCB","BSL","ITA","B
 p4 = 
   ggplot(depart_time,aes(x = Owner, y = avg,group=1))+
   geom_line()+
-  theme(axis.text.x=element_text())+
+  theme(axis.text.x=element_blank())+
   geom_text(aes(label = as.integer(avg)),hjust =-0.6,vjust=0.9)+
   ylab("Average Processing Time (hours)")+
   xlab("")+
@@ -301,8 +301,8 @@ ggplot(subset1, aes(x= RequestType, y = frequency/1000, fill = RequestSource))+
   theme(axis.text.x=element_text(angle = 15,vjust = 1, hjust=1))+
   ggtitle("Top5 Seriveces by Top5 Request Sources")+
   ylab("Frequency")+
-  xlab("")
-  #+theme_light()
+  xlab("")+
+  theme_classic()
 ```
 
 #Summary-Service Type by Month Frequency Summary (Many LineGraphs) Lulu
@@ -506,17 +506,137 @@ RequestSource%>%
   ggtitle("Successful Rate break down by Request Source")
 ```
 
-#Lulu's Map (in process)
+#Lulu's Map -- frequency
 ```{r}
-data %>%
-  filter(Status=="Cancelled"& RequestType=="Other") %>%
-  ggplot(aes(x = Longitude, y = Latitude)) +
-  geom_point() +
-  geom_text(aes(label = RequestType), vjust = -1) +
-  coord_map() 
+LA = qmap("Los Angeles", zoom = 10, maptype = "roadmap", color="bw")
+LA
+
+data$region =ifelse(data$PolicePrecinct %in% c("CENTRAL","HOLLENBECK","NEWTON","NORTHEAST","RAMPART"),"Central",ifelse(data$PolicePrecinct %in% c("77TH STREET","HARBOR","SOUTHEAST","SOUTHWEST"),"South",ifelse(data$PolicePrecinct %in% c("DEVONSHIRE","FOOTHILL","MISSION","NORTH HOLLYWOOD","VAN NUYS","WEST VALLEY","TOPANGA"),"Valley",ifelse(data$PolicePrecinct %in% c("HOLLYWOOD","OLYMPIC","PACIFIC","WEST LOS ANGELES","WILSHIRE"),"West","Other"))))
+
+Bulky=data %>%
+  filter(RequestType=="Bulky Items"&region !="Other")
+
+col_values = c('Central'='plum','South'='slateblue1','Valley'='seagreen3','West'='gold')
+  
+LA+
+  stat_density2d(data=Bulky,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  scale_fill_manual(values=col_values)+
+  scale_alpha(guide=F)+
+  ggtitle("Bulky Items Requested Density by Region")
+
+
+##################
+Graffiti=data %>%
+  filter(RequestType=="Graffiti Removal"&region !="Other")
+
+LA+
+  stat_density2d(data=Graffiti,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  scale_fill_manual(values=col_values)+
+  scale_alpha(guide=F)+
+  ggtitle("Graffiti Removal Requested Density by Region")
+
+##################
+Dumping=data %>%
+  filter(RequestType=="Illegal Dumping Pickup"&region !="Other")
+
+LA+
+  stat_density2d(data=Graffiti,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  scale_fill_manual(values=col_values)+
+  scale_alpha(guide=F)+
+  ggtitle("Illegal Dumping Pickup Requested Density by Region")
+
+#####################
+Metal=data %>%
+  filter(RequestType=="Metal/Household Appliances"&region !="Other")
+
+LA+
+  stat_density2d(data=Graffiti,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  scale_fill_manual(values=col_values)+
+  scale_alpha(guide=F)+
+  ggtitle("Metal/Household Appliances Requested Density by Region")
+#####################
+Single=data %>%
+  filter(RequestType=="Single Streetlight Issue"&region !="Other")
+
+LA+
+  stat_density2d(data=Graffiti,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  scale_fill_manual(values=col_values)+
+  scale_alpha(guide=F)+
+  ggtitle("Single Streetlight Issue Requested Density by Region")
+
+
+########################
+LA +
+stat_density2d(aes(x = Longitude, y = Latitude, colour = RequestType),
+    size = 3, bins = 2, alpha = 3/4, data = data) +
+scale_colour_discrete("Services") +
+theme(
+    legend.text = element_text(size = 15, vjust = .5),
+    legend.title = element_text(size = 15,face="bold"),
+    legend.key.size = unit(1.8,"lines")
+    )
+###############
+subset3 = data %>% filter(RequestType %in% c("Bulky Items","Graffiti Removal","Metal/Household Appliances"))
+
+LA +
+stat_density2d(aes(x = Longitude, y = Latitude, colour = RequestType),
+    size = 3, bins = 2, alpha = 3/4, data = subset3) +
+scale_colour_discrete("Services") +
+theme(
+    legend.text = element_text(size = 15, vjust = .5),
+    legend.title = element_text(size = 15,face="bold"),
+    legend.key.size = unit(1.8,"lines")
+    )
+##############
+subset4 = data %>% filter(RequestType != "Bulky Items" &RequestType !="Graffiti Removal"&RequestType !="Metal/Household Appliances")
+
+LA +
+stat_density2d(aes(x = Longitude, y = Latitude, colour = RequestType),
+    size = 3, bins = 2, alpha = 3/4, data = subset4) +
+scale_colour_discrete("Services") +
+theme(
+    legend.text = element_text(size = 15, vjust = .5),
+    legend.title = element_text(size = 15,face="bold"),
+    legend.key.size = unit(1.8,"lines")
+    )
+###################
+LA +
+stat_density2d(aes(x = Longitude, y = Latitude),
+    size = 3, bins = 2, alpha = 3/4, data = data) +
+scale_colour_discrete("Services") +
+theme(
+    legend.text = element_text(size = 15, vjust = .5),
+    legend.title = element_text(size = 15,face="bold"),
+    legend.key.size = unit(1.8,"lines")
+    )+
+  facet_wrap(~RequestType,nrow=3)+
+  ggtitle("Services Main Area")
+
+```
+
+#Map -- processing time  Lulu
+```{r}
+LA+
+  stat_density2d(data=Bulky,aes(x=Longitude, y =Latitude,fill=ProcessHours,alpha=..level..),bins=10,geom="polygon",col="springgreen")+
+  scale_alpha(guide=F)+
+  ggtitle("Bulky Items Processing Time by Region")
+
+
+LA+
+  stat_density2d(data=data,aes(x=Longitude, y =Latitude,fill=ProcessHours,alpha=..level..),bins=10,geom="polygon",col="springgreen")+
+  scale_alpha(guide=F)+
+  ggtitle("Services Processing Time by Region")
+
+
 ```
 
 
+
+
+
+
+
+```
 
 
 
