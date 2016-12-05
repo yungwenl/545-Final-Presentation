@@ -41,9 +41,9 @@ service_type$top3 = service_type$frequency > 70000
 
 p1 = ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/1000, fill =service_type$top3)) +
   geom_bar(stat = "identity") +
-  scale_y_continuous(limits = c(0,540),
-    labels = seq(0,540,100),
-                     breaks = seq(0,540,100)) +
+  scale_y_continuous(limits = c(0,600),
+    labels = seq(0,600,100),
+                     breaks = seq(0,600,100)) +
   ylab("Frequency") +
   geom_text(aes(label = frequency/1000), vjust = -0.2) +
   scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)+
@@ -69,6 +69,7 @@ grid.arrange(p2,p1, nrow = 2,
              top = "Services Type Frequency(thousands) vs. Processing Time(hours)") 
 
 ```
+
 #2 graphs-Department Frequency(thousands) vs. Processing Time(hours) Lacy
 ```{r}
 data=backup
@@ -118,24 +119,55 @@ grid.arrange(p4,p3, nrow = 2,
 
 ```
 
-#Request Source Frequency(Thousands) Bar Chart Lulu
+
+#Request Source VS Frequency(Thousands) Bar Chart Lulu
 ```{r}
 input_channel = data %>%
   filter(Status !="Cancelled") %>%
   group_by(RequestSource) %>%
   summarize(frequency = n())
 
-ggplot(input_channel, aes(x= reorder(RequestSource, frequency/1000), y = frequency/1000))+
+#str(input_channel)
+input_channel$level= ifelse(input_channel$frequency <=1000, "low",ifelse(input_channel$frequency >101000, "high","medium"))  
+input_channel$level=factor(input_channel$level)
+
+ggplot(input_channel, aes(x= reorder(RequestSource,-(frequency/1000)), y = (frequency/1000),fill = level))+
   geom_bar(stat = "identity") +
-  coord_flip()+
-  geom_text(aes(label=frequency),hjust = -0.1)+
+  scale_fill_manual(values = c("indianred1","lightblue","cornflowerblue"), guide =F)+
+  geom_text(aes(label=round(frequency/1000)),hjust = 0.6)+
   scale_y_continuous(limits = c(0,680),
                      labels = seq(0,680,100),
                      breaks = seq(0,680,100)) +
+  theme(axis.text.x=element_text(angle = 25,vjust = 1, hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))+
   xlab("")+
   ylab("Frequency")+
   ggtitle("Request Source (Thousands)")
 ```
+#Request Source VS Average Processing Hours Lacy
+```{r}
+avg_data=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+  group_by(RequestSource)%>%
+  summarise(avg = mean(ProcessHours)) 
+
+avg_data$level= ifelse(avg_data$avg <=99, "low",ifelse(avg_data$avg>250, "high","medium"))
+
+ggplot(avg_data,aes(x = reorder(RequestSource,-avg), y = avg, fill = level))+
+  geom_bar(stat = "identity")+
+  scale_fill_manual(values = c("indianred1","lightblue","cornflowerblue"), guide =F)+
+  theme(axis.text.x=element_text(angle = 25,vjust = 1, hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))+
+  geom_text(aes(label = as.integer(avg)),hjust =0.6)+
+  ylab("Average Processing Hours")+
+  xlab("Source of Request")+
+  ggtitle("Average Processing Hours vs Source of Request")
+```
+
 
 #Summary - Service Type by Request Source Frequency(Thousands)" Summary Lulu
 ```{r}
@@ -149,6 +181,31 @@ data %>%
   xlab("Service Type")+
   ggtitle("Service Type by Request Source Summary")
 ```
+
+#Frequency breakdown by input channel Lacy
+```{r}
+input_channel = data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+  group_by(RequestSource) %>%
+  summarize(frequency = n())%>%
+  mutate(count = frequency/1000)%>%
+  filter(count>=0.19)
+
+ggplot(input_channel, aes(x= reorder(RequestSource,count), y = count, fill= count>600))+
+  geom_bar(stat = "identity") +
+  coord_flip()+
+  scale_fill_manual(values = c("lightblue","pink"),guide = F)+
+  geom_text(aes(label=round(frequency/1000)),hjust = -0.1)+
+  scale_y_continuous(limits = c(0,630),
+    labels = seq(0,630,100),
+                     breaks = seq(0,630,100)) +
+  theme_classic()+
+  ylab("Frequency (Thousands)")+
+  xlab("Request Source")+
+  ggtitle("Frequency of Request Sources")
+  
+```
+
 
 #Service Type Frequency(Thousands) by Call  Lulu
 ```{r}
@@ -342,6 +399,7 @@ data %>%
   ggtitle("Average Processing Hours vs Department")
 ```
 
+
 #Overall call freqency (Map) Lacy
 ```{r}
 LA = qmap("Los Angeles", zoom = 14, maptype = "roadmap", color="bw")
@@ -351,6 +409,17 @@ LA +
                  geom = "polygon", alpha = 0.2)+
   scale_fill_gradient(low = "white", high = "darkred" )+
   ggtitle("Calls Frequency Map")
+```
+
+#Processing Time Map
+```{r}
+data_finished=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed")
+LA +
+  stat_density2d(data = subset(data_finished,data_finished$Latitude != ""),
+                 aes(x = Longitude, y = Latitude , fill = ProcessHours),
+                 geom = "polygon", alpha = 0.2)+
+  ggtitle("Processing Time by Region")
 ```
 
 #Successful Rate by Service Type (Point graph) Emily
