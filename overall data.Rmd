@@ -13,20 +13,51 @@ knitr::opts_chunk$set(echo = TRUE)
 #Set up data and function Data backup building
 ```{r}
 data=read.csv("MyLA311_Service_Request_Data_2016.csv")
-#original_backup=data
+
 library(dplyr)
 library(ggplot2)
 library(ggmap)
 library(lubridate)
-data$CreatedDate=mdy_hms(data$CreatedDate)
-data$UpdatedDate=mdy_hms(data$UpdatedDate)
+library(gridExtra)
+
+data$CreatedDate=mdy_hm(data$CreatedDate)
+data$UpdatedDate=mdy_hm(data$UpdatedDate)
+#backup_0=data
+#data=backup_0
+data$month=month(data$CreatedDate, label=T)
+data$wday=wday(data$CreatedDate, label=T)
+data$month= factor(data$month, levels = c("Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun","Jul","Aug","Sep","Oct","Nov"))
 data$ProcessHours = round(difftime(data$UpdatedDate,data$CreatedDate,units = c("hours")),2)
-data=backup
+data$region =ifelse(data$PolicePrecinct %in% c("CENTRAL","HOLLENBECK","NEWTON","NORTHEAST","RAMPART"),"Central",ifelse(data$PolicePrecinct %in% c("77TH STREET","HARBOR","SOUTHEAST","SOUTHWEST"),"South",ifelse(data$PolicePrecinct %in% c("DEVONSHIRE","FOOTHILL","MISSION","NORTH HOLLYWOOD","VAN NUYS","WEST VALLEY","TOPANGA"),"Valley",ifelse(data$PolicePrecinct %in% c("HOLLYWOOD","OLYMPIC","PACIFIC","WEST LOS ANGELES","WILSHIRE"),"West","Other"))))
+
+data1=data%>%
+  filter(Status!="Cancelled" & region != "Other")
+
+```{r}
+LA1+
+  stat_density2d(data=data1,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  scale_fill_manual(values=col_values)+
+  scale_alpha(guide=F)+
+  ggtitle("Services Requested Density by Region")
+```
+
+
+
+#backup=data
+#data=backup
 ```
 
 #2 graphs-Distribution of Services VS Processing Time Lacy Lulu
 ```{r}
-data=backup
+LA1+
+  stat_density2d(data=Homeless,
+                 aes(x=Longitude,
+                     y =Latitude,
+                     fill=ProcessHours,
+                     alpha=..level..),
+                 bins=10,geom="polygon",col="darkblue")+
+  ggtitle("Processing Time of Homeless")
+  
 service_type = data %>%
   filter(Status !="Cancelled") %>%
   group_by(RequestType) %>%
@@ -47,8 +78,13 @@ p1 = ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/10
   ylab("Frequency") +
   geom_text(aes(label = frequency/1000), vjust = -0.2) +
   scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)+
-  theme(axis.text.x=element_text(angle = 30,vjust = 1, hjust=1))+
-  xlab("")
+  theme(axis.text.x=element_text(angle = 25,vjust =1 ,hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "bottom")+
+  xlab("")+
+  ggtitle("Frequency by Service Type")
 
 
 lev =levels(process_time$RequestType)
@@ -101,8 +137,33 @@ depart_time = data%>%
   group_by(Owner)%>%
   summarise(avg = mean(ProcessHours))
 
-depart_time$Owner=factor(depart_time$Owner, levels =c("BOS","OCB","BSL","ITA","BSS","LADWP"))
+depart_time$Owner=factor(depart_time$Owner, levels =c("OCB","BOS","BSL","ITA","BSS","LADWP"))
 
+####
+p4 = 
+  ggplot(depart_time,aes(x = Owner, y = avg,group=1))+
+  geom_line()+
+  theme(axis.text.x=element_blank())+
+  geom_text(aes(label = as.integer(avg)),hjust =-0.6,vjust=0.9)+
+  ylab("Average Processing Time (hours)")+
+  xlab("")+
+  geom_point(size=1,shape=3)
+
+grid.arrange(p4,p3, nrow = 2,
+             top = "Department Frequency(thousands) vs. Processing Time(hours)") 
+
+```
+
+#3 graphs-Department/Reqest vs. Processing Time(hours) Emily
+```{r}
+
+depart_time = data%>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & Owner !="" & Owner !="BOE") %>%
+  droplevels()%>%
+  group_by(Owner)%>%
+  summarise(avg = mean(ProcessHours))
+
+depart_time$Owner=factor(depart_time$Owner, levels =c("OCB","BOS","BSL","ITA","BSS","LADWP"))
 
 p4 = 
   ggplot(depart_time,aes(x = Owner, y = avg,group=1))+
@@ -113,9 +174,152 @@ p4 =
   xlab("")+
   geom_point(size=1,shape=3)
 
+subset8=data %>%
+  filter(Status !="Cancelled" & Owner!="" & Owner!="BOE") %>%
+  group_by(RequestType,Owner) %>%
+  droplevels()%>%
+  summarise(frequency = n()) %>%
+  filter(frequency>1000) 
 
-grid.arrange(p4,p3, nrow = 2,
-             top = "Department Frequency(thousands) vs. Processing Time(hours)") 
+levels(subset7$RequestType)
+levels(subset7$Owner)
+
+p5=ggplot(subset8, aes(x= reorder(Owner,-frequency), y = scale(frequency), fill = RequestType))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values =c("tomato","rosybrown1","gold1","darkolivegreen2","darkblue","darkgreen","aquamarine3","cornflowerblue","black","mediumpurple2","gainsboro","chocolate4"))+
+  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "bottom")+
+  #geom_text(aes(label = frequency),vjust=-1)+
+  ggtitle("Standardized Frequency of Service Requests by Departments")+
+  ylab("")+
+  xlab("Deparment")
+
+grid.arrange(p4,p5, nrow = 2,
+             top = "Average Processing Time by Departments") 
+```
+
+#3 graphs-Department/ Standardized Frequency & Processing Time Emily
+```{r}
+data=backup
+
+depart_time = data%>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & Owner !="" & Owner !="BOE") %>%
+  droplevels()%>%
+  group_by(Owner)%>%
+  summarise(avg = mean(ProcessHours))
+
+depart_time$Owner=factor(depart_time$Owner, levels =c("OCB","BOS","BSL","ITA","BSS","LADWP"))
+
+p6 = 
+  ggplot(depart_time,aes(x = Owner, y = scale(avg),group=1))+
+  geom_line()+
+  theme(axis.text.x=element_blank())+
+  geom_text(aes(label = round(scale(avg),2)),hjust =-0.6,vjust=0.9)+
+  ylab("Average Processing Time (hours)")+
+  xlab("")+
+  geom_point(size=1,shape=3)
+
+subset8=data %>%
+  filter(Status !="Cancelled" & Owner!="" & Owner!="BOE") %>%
+  group_by(RequestType,Owner) %>%
+  droplevels()%>%
+  summarise(frequency = n()) %>%
+  filter(frequency>1000) 
+
+levels(subset7$RequestType)
+levels(subset7$Owner)
+
+p5=ggplot(subset8, aes(x= reorder(Owner,-frequency), y = scale(frequency), fill = RequestType))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values =c("tomato","rosybrown1","gold1","darkolivegreen2","darkblue","darkgreen","aquamarine3","cornflowerblue","black","mediumpurple2","gainsboro","chocolate4"))+
+  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "bottom")+
+  geom_text(aes(label = frequency),vjust=0.1)+
+  ggtitle("Standardized Frequency of Service Requests by departments")+
+  ylab("")+
+  xlab("Deparment")
+
+grid.arrange(p6,p5, nrow = 2,
+             top = "Standardized Average Precessing Time by departments") 
+```
+
+#3 graphs-Department/Service/ Standardized Frequency & Processing Time Emily
+```{r}
+
+######
+depart_time2 = data%>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & Owner !="" & Owner !="BOE") %>%
+  droplevels()%>%
+  group_by(Owner,RequestType)%>%
+  summarise(avg = mean(ProcessHours))
+
+depart_time2$Owner=factor(depart_time$Owner, levels =c("OCB","BOS","BSL","ITA","BSS","LADWP"))
+#######
+depart_time3 = data%>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & Owner !="" & Owner !="BOE") %>%
+  droplevels()%>%
+  group_by(Owner,RequestType)%>%
+  summarise(str_avg = scale(mean(ProcessHours)))
+
+depart_time3$Owner=factor(depart_time$Owner, levels =c("OCB","BOS","BSL","ITA","BSS","LADWP"))
+
+
+### By Department ; Fill: Type
+p7=ggplot(depart_time2, aes(x= reorder(Owner,-avg), y = scale(avg), fill = RequestType))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values =c("tomato","rosybrown1","gold1","darkolivegreen2","darkblue","darkgreen","aquamarine3","cornflowerblue","black","mediumpurple2","gainsboro","chocolate4"))+
+  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "bottom")
+
+### By Type; Fill: Department
+depart_time2%>%
+filter(RequestType!="Report Water Waste" & RequestType!="Feedback" & RequestType!="Other")%>%
+ggplot(aes(x= reorder(RequestType,-avg), y =avg, fill = Owner))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values =c("tomato","rosybrown1","gold1","darkolivegreen2","darkblue","darkgreen","aquamarine3","cornflowerblue","black","mediumpurple2","gainsboro","chocolate4"))+
+  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "bottom")+
+    xlab("")+
+    ylab("Hours")+
+    ggtitle("Department VS Request (Average Processing Hours)")
+
+efi_all_std=
+  depart_time2%>%
+  ggplot(aes(x= reorder(RequestType,-avg), y = scale(avg), fill = Owner))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values =c("tomato","rosybrown1","gold1","darkolivegreen2","darkblue","darkgreen","aquamarine3","cornflowerblue","black","mediumpurple2","gainsboro","chocolate4"))+
+  theme(axis.text.x=element_blank(),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "bottom")+
+  facet_wrap((~RequestType))+
+  ggtitle("Standardized Processing Hours By Department")
+
+efi_all=
+  depart_time2%>%
+  ggplot(aes(x= reorder(RequestType,-avg), y = avg, fill = Owner))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values =c("tomato","rosybrown1","gold1","darkolivegreen2","darkblue","darkgreen","aquamarine3","cornflowerblue","black","mediumpurple2","gainsboro","chocolate4"))+
+   theme(axis.text.x=element_blank(),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "bottom")+
+  facet_wrap((~RequestType))+
+  ggtitle("Non-standardize Processing Hours By Department")
 
 ```
 
@@ -146,6 +350,7 @@ ggplot(input_channel, aes(x= reorder(RequestSource,-(frequency/1000)), y = (freq
   ylab("Frequency")+
   ggtitle("Request Source (Thousands)")
 ```
+
 #Request Source VS Average Processing Hours Lacy
 ```{r}
 avg_data=data %>%
@@ -168,19 +373,163 @@ ggplot(avg_data,aes(x = reorder(RequestSource,-avg), y = avg, fill = level))+
   ggtitle("Average Processing Hours vs Source of Request")
 ```
 
-
 #Summary - Service Type by Request Source Frequency(Thousands)" Summary Lulu
 ```{r}
 data %>%
   filter(Status !="Cancelled") %>%
   group_by(RequestType, RequestSource) %>%
-  summarize(frequency = n()) %>%
+  summarise(frequency = n()) %>%
   ggplot(aes(x= RequestType,y= frequency)) +
   geom_bar(stat ="identity") +
   facet_wrap((~RequestSource))+
   xlab("Service Type")+
   ggtitle("Service Type by Request Source Summary")
 ```
+
+#Summary - Service Type by Owner BreakDown
+```{r}
+unique(data$Owner)
+summary(data$Owner)
+
+subset5=data %>%
+  filter(Status !="Cancelled" & Owner!="" & Owner!="BOE") %>%
+  group_by(Owner) %>%
+  summarise(frequency = n()) 
+
+#Standardized # of Major Accepeted Request
+subset6=data %>%
+  filter(Status !="Cancelled" & Owner!="" & Owner!="BOE") %>%
+  group_by(Owner,RequestType) %>%
+  summarise(frequency = n()) %>%
+  filter(frequency>1000) 
+ggplot(subset6, aes(x= reorder(RequestType,-frequency), y = scale(scale(frequency)), fill = Owner))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))+
+  #geom_text(label = Owner,vjust=0.1)+
+  ggtitle("Owner's Major Responsibility Overview")+
+  ylab("Standardized # of Major Accepeted Request")+
+  xlab("Service Request")
+
+#Standardized # of Major Accepeted Request
+subset7=data %>%
+  filter(Status !="Cancelled" & Owner!="" & Owner!="BOE") %>%
+  group_by(RequestType,Owner) %>%
+  summarise(frequency = n()) %>%
+  filter(frequency>1000) 
+
+ggplot(subset7, aes(x= reorder(Owner,-frequency), y = scale(frequency), fill = RequestType))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values =c("tomato","rosybrown1","gold1","darkolivegreen2","darkblue","darkgreen","aquamarine3","cornflowerblue","black","mediumpurple2","gainsboro","chocolate4"))+
+  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))+
+  #geom_text(aes(label = Owner),vjust=0.1)+
+  ggtitle("Standardized # of Accepeted Request by Department")+
+  ylab("Standardized Freqency")+
+  xlab("Service Request")
+
+
+# Facet All
+data %>%
+  filter(Status !="Cancelled" & Owner!="" & Owner!="BOE") %>%
+  group_by(RequestType, Owner) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= RequestType,y= frequency) +
+  geom_bar(stat ="identity") +
+  facet_wrap((~Owner))+
+  xlab("Service Type")+
+  ggtitle("Service Type by Owner Summary")
+
+###BOS
+data %>%
+  filter(Status !="Cancelled" & Owner=="BOS") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= reorder(RequestType,-frequency),y= frequency)) +
+  geom_bar(stat ="identity", fill="cornflowerblue") +
+  xlab("Service Type")+
+  ggtitle("BOS")+
+  theme(axis.text.x=element_text(angle = 25,vjust =1 , hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))
+
+###BSS
+data %>%
+  filter(Status !="Cancelled" & Owner=="BSS") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= reorder(RequestType,-frequency),y= frequency)) +
+  geom_bar(stat ="identity", fill="cadetblue3") +
+  xlab("Service Type")+
+  ggtitle("BSS")+
+  theme(axis.text.x=element_text(angle = 25,vjust =1 , hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))
+#BSL
+data %>%
+  filter(Status !="Cancelled" & Owner=="BSL") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= reorder(RequestType,-frequency),y= frequency)) +
+  geom_bar(stat ="identity", fill="aquamarine3") +
+  xlab("Service Type")+
+  ggtitle("BSL")+
+  theme(axis.text.x=element_text(angle = 25,vjust =1 , hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))
+
+#ITA
+data %>%
+  filter(Status !="Cancelled" & Owner=="ITA") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= reorder(RequestType,-frequency),y= frequency)) +
+  geom_bar(stat ="identity", fill="paleturquoise3") +
+  xlab("Service Type")+
+  ggtitle("ITA")+
+  theme(axis.text.x=element_text(angle = 25,vjust =1 , hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))
+
+# OCB
+data %>%
+  filter(Status !="Cancelled" & Owner=="OCB") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= reorder(RequestType,-frequency),y= frequency)) +
+  geom_bar(stat ="identity", fill="royalblue4") +
+  xlab("Service Type")+
+  ggtitle("OCB")+
+  theme(axis.text.x=element_text(angle = 25,vjust =1 , hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))
+
+# LADWP
+data %>%
+  filter(Status !="Cancelled" & Owner=="LADWP") %>%
+  group_by(RequestType) %>%
+  summarize(frequency = n()) %>%
+  ggplot(aes(x= reorder(RequestType,-frequency),y= frequency)) +
+  geom_bar(stat ="identity", fill="skyblue3") +
+  xlab("Service Type")+
+  ggtitle("LADWP")+
+  theme(axis.text.x=element_text(angle = 25,vjust =1 , hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))
+
+```
+
+
 
 #Frequency breakdown by input channel Lacy
 ```{r}
@@ -277,6 +626,7 @@ data %>%
   xlab("Email Request")
 ```
 
+
 #TOP5 Seriveces by Top5 Input Channel(Fancy Bar) Lulu
 ```{r}
 subset1 =data %>% 
@@ -305,20 +655,21 @@ ggplot(subset1, aes(x= RequestType, y = frequency/1000, fill = RequestSource))+
   theme_classic()
 ```
 
+
 #Summary-Service Type by Month Frequency Summary (Many LineGraphs) Lulu
 ```{r}
-data=backup
 
 subset2 = data %>%
-  group_by(RequestType, month = month(CreatedDate, label = T)) %>%
+  group_by(RequestType, month)%>%
   summarise(count = n())
 
 ggplot(data = subset2, aes(x = month, y = count, group =1)) +
   geom_line(stat = "identity") +
   facet_wrap(~RequestType,nrow = 4)+
-  ggtitle("All Service Types by Month (Frequency)")+
+  ggtitle("All Service Types 2015.12-2016.11 (Frequency)")+
   ylab("Frequecy (Thousands)")
 ```
+
 
 #Summary-Service Types by Month Frequency Summary (One LineGraph) Lulu
 ```{r}
@@ -328,6 +679,7 @@ ggplot(aes(x = month, y = count/1000, group = RequestType, col=RequestType)) +
   ggtitle("All Services Request by Month")+
   ylab("Frequecy (Thousands)")
 ```
+
 
 #Service Types by Month Frequency Summary without Bulky Items & Graffiti Removal (One LineGraph) Lulu
 ```{r}
@@ -353,18 +705,258 @@ subset2 %>%
   filter(RequestType =="Bulky Items") %>%
   ggplot(aes(x = month, y = count, group =1)) +
   geom_line(stat = "identity") +
-  ggtitle("Bulky Items Service Request by Month")
+  ggtitle("Bulky Items Service Request by Month")+
+  theme_classic()+
+  geom_point(size=2)
 ```  
 
 #Service Types by Month Frequency Summary (HeatMap) Lulu
 ```{r}
-  ggplot(subset2, aes(x=month, y = RequestType, fill = count))+
+
+heatmap1 = data %>%
+  group_by(RequestType, month)%>%
+  summarise(count = n())
+
+  ggplot(heatmap1, aes(x=month, y = RequestType, fill = count))+
   geom_tile() +
   scale_fill_gradient(low = "white", high = "darkgreen") +
   ylab("Service Type") +
   xlab("Month")
 
 ```
+
+#Service Types Frequency by Month no "bulky"  "Graffiti"  "Metal" "Dumping" & "other"
+```{r}
+
+heatmap2 = data %>%
+  filter(RequestType!="Bulky Items" & RequestType !="Graffiti Removal"& RequestType !="Metal/Household Appliances" & RequestType !="Other" & RequestType !="Illegal Dumping Pickup") %>%
+  group_by(RequestType, month) %>%
+  summarise(count = n())
+
+ggplot(heatmap2, aes(x=month, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "darkgreen") +
+  ylab("Service Type") +
+  xlab("Month")
+```
+
+##Service Types Frequency by Month only Bulky Items
+```{r}
+
+heatmap3 = data %>%
+  filter(RequestType == "Bulky Items")%>%
+  group_by(RequestType, month) %>%
+  summarise(count = n())
+
+ggplot(heatmap3, aes(x=month, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "darkgreen") +
+  ylab("Service Type") +
+  xlab("Month")+
+  ggtitle("Service Types Frequency by Month only Bulky Items")
+
+#
+heatmap_bulky_2016_8_wday_hours= Bulky %>%
+  mutate(year=year(CreatedDate))%>%
+  filter(month == "Aug")%>%
+  group_by(wday = wday(CreatedDate,label=T),
+           hours= hour(CreatedDate)) %>%
+  summarise(count = n())%>%
+  ggplot(aes(x=wday, y = hours, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "Navy") +
+  ylab("Hours") +
+  xlab("Days")+
+  ggtitle("Bulky Items Frequency in August 2016")
+
+#
+
+unique(heatmap_bulky_2016_9_wday_hours$year)
+heatmap_bulky_2016_9_wday_hours= Bulky %>%
+  mutate(year=year(CreatedDate))%>%
+  #filter(month == "Sep" & year=="2016")%>%
+  group_by(wday = wday(CreatedDate,label=T),
+           hours= hour(CreatedDate),
+           year) %>%
+  summarise(count = n())%>%
+  ggplot(aes(x=wday, y = hours, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "darkgreen") +
+  ylab("Hours") +
+  xlab("Days")+
+  ggtitle("Bulky Items Frequency in September 2016")
+
+
+```
+
+##Service Types Frequency by Month only  and "Graffiti" and "Metal"
+```{r}
+data=backup
+heatmap3 = data %>%
+  filter(RequestType %in% c("Metal/Household Appliances","Illegal Dumping Pickup"))%>%
+  group_by(RequestType, month = month(CreatedDate, label = T)) %>%
+  summarise(count = n())
+
+ggplot(heatmap3, aes(x=month, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "darkgreen") +
+  ylab("Service Type") +
+  xlab("Month")
+```
+
+#Service Types Frequency by Day
+```{r}
+data=backup
+
+heatmap_day1 = data %>%
+  group_by(RequestType, day = wday(CreatedDate, label = T)) %>%
+  summarise(count = n())
+
+  ggplot(heatmap_day1, aes(x=day, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "indianred1") +
+  ylab("Service Type") +
+  xlab("Day")+
+    theme_classic()
+```
+
+#Service Types Frequency by Day only "bulky" and "Graffiti" and "Metal"
+```{r}
+data=backup
+
+heatmap_day3 = data %>%
+  filter(RequestType %in% c("Bulky Items","Graffiti Removal","Metal/Household Appliances")) %>%
+  group_by(RequestType, day = wday(CreatedDate, label = T)) %>%
+  summarise(count = n())
+
+  ggplot(heatmap_day3, aes(x=day, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "indianred1") +
+  ylab("Service Type") +
+  xlab("Day")+
+    theme_classic()
+```
+
+#Service Types Frequency by Day no "bulky" and "Graffiti" and "Metal"
+```{r}
+data=backup
+
+heatmap_day2 = data %>%
+  filter(RequestType!="Bulky Items" & RequestType !="Graffiti Removal"& RequestType !="Metal/Household Appliances") %>%
+  group_by(RequestType, day = wday(CreatedDate, label = T)) %>%
+  summarise(count = n())
+
+  ggplot(heatmap_day2, aes(x=day, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "indianred1") +
+  ylab("Service Type") +
+  xlab("Day")+
+    theme_classic()
+```
+
+#Service Types Frequency by Hours
+```{r}
+data=backup
+
+heatmap_hour1 = data %>%
+  group_by(RequestType, hour= hour(CreatedDate)) %>%
+  summarise(count = n())
+
+  ggplot(heatmap_hour1, aes(x=hour, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "cornflowerblue") +
+  ylab("Service Type") +
+  xlab("Hour")+
+    theme_classic()
+```
+
+#Service Types Frequency by Hours only "bulky" and "Graffiti" and "Metal"
+```{r}
+data=backup
+
+heatmap_hour3 = data %>%
+  filter(RequestType %in% c("Bulky Items","Graffiti Removal","Metal/Household Appliances")) %>%
+  group_by(RequestType, day = hour(CreatedDate)) %>%
+  summarise(count = n())
+
+  ggplot(heatmap_hour3, aes(x=day, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "cornflowerblue") +
+  ylab("Service Type") +
+  xlab("Hours")+
+    theme_classic()
+```
+
+#Service Types Frequency by Hours no "bulky" and "Graffiti" and "Metal"
+```{r}
+data=backup
+
+heatmap_hour2 = data %>%
+  filter(RequestType!="Bulky Items" & RequestType !="Graffiti Removal"& RequestType !="Metal/Household Appliances") %>%
+  group_by(RequestType, hour = hour(CreatedDate)) %>%
+  summarise(count = n())
+
+  ggplot(heatmap_hour2, aes(x=hour, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "cornflowerblue") +
+  ylab("Service Type") +
+  xlab("Hours")+
+    theme_classic()
+```
+
+#Service Types Frequency by Peak Hours 
+```{r}
+data=backup
+
+heatmap_hour4 = data %>%
+  group_by(RequestType, hour= hour(CreatedDate)) %>%
+  summarise(count = n())%>%
+  filter(hour>=8 & hour <=20)
+
+  ggplot(heatmap_hour4, aes(x=hour, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "cornflowerblue") +
+  ylab("Service Type") +
+  xlab("Hour")+
+    theme_classic()
+```
+
+#Service Types Frequency by Peak Hours "bulky" and "Graffiti" and "Metal" Peak Hours
+```{r}
+data=backup
+
+heatmap_hour5 = data %>%
+  filter(RequestType %in% c("Bulky Items","Graffiti Removal","Metal/Household Appliances")) %>%
+  group_by(RequestType, hour = hour(CreatedDate)) %>%
+  summarise(count = n())%>%
+  filter(hour>=8 & hour <=20)
+
+  ggplot(heatmap_hour5, aes(x=hour, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "cornflowerblue") +
+  ylab("Service Type") +
+  xlab("Hours")+
+    theme_classic()
+```
+
+#Service Types Frequency by Peak Hours no "bulky" and "Graffiti" and "Metal" 
+```{r}
+data=backup
+
+heatmap_hour6 = data %>%
+  filter(RequestType!="Bulky Items" & RequestType !="Graffiti Removal"& RequestType !="Metal/Household Appliances") %>%
+  group_by(RequestType, hour = hour(CreatedDate)) %>%
+  summarise(count = n())%>%
+  filter(hour>=8 & hour <=20)
+
+  ggplot(heatmap_hour6, aes(x=hour, y = RequestType, fill = count))+
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "cornflowerblue") +
+  ylab("Service Type") +
+  xlab("Hours")+
+    theme_classic()
+```
+
 
 #Average Processing Hrs by RequestType (Bar) Lacy
 ```{r}
@@ -398,7 +990,6 @@ data %>%
   ylab("Average Processing Time (hours)")+
   ggtitle("Average Processing Hours vs Department")
 ```
-
 
 #Overall call freqency (Map) Lacy
 ```{r}
@@ -511,14 +1102,9 @@ RequestSource%>%
 LA = qmap("Los Angeles", zoom = 10, maptype = "roadmap", color="bw")
 LA
 
-data$region =ifelse(data$PolicePrecinct %in% c("CENTRAL","HOLLENBECK","NEWTON","NORTHEAST","RAMPART"),"Central",ifelse(data$PolicePrecinct %in% c("77TH STREET","HARBOR","SOUTHEAST","SOUTHWEST"),"South",ifelse(data$PolicePrecinct %in% c("DEVONSHIRE","FOOTHILL","MISSION","NORTH HOLLYWOOD","VAN NUYS","WEST VALLEY","TOPANGA"),"Valley",ifelse(data$PolicePrecinct %in% c("HOLLYWOOD","OLYMPIC","PACIFIC","WEST LOS ANGELES","WILSHIRE"),"West","Other"))))
-
-Bulky=data %>%
-  filter(RequestType=="Bulky Items"&region !="Other")
-
 col_values = c('Central'='plum','South'='slateblue1','Valley'='seagreen3','West'='gold')
   
-LA+
+LA1+
   stat_density2d(data=Bulky,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
   scale_fill_manual(values=col_values)+
   scale_alpha(guide=F)+
@@ -540,7 +1126,7 @@ Dumping=data %>%
   filter(RequestType=="Illegal Dumping Pickup"&region !="Other")
 
 LA+
-  stat_density2d(data=Graffiti,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  stat_density2d(data=Dumping,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
   scale_fill_manual(values=col_values)+
   scale_alpha(guide=F)+
   ggtitle("Illegal Dumping Pickup Requested Density by Region")
@@ -550,7 +1136,7 @@ Metal=data %>%
   filter(RequestType=="Metal/Household Appliances"&region !="Other")
 
 LA+
-  stat_density2d(data=Graffiti,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  stat_density2d(data=Metal,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
   scale_fill_manual(values=col_values)+
   scale_alpha(guide=F)+
   ggtitle("Metal/Household Appliances Requested Density by Region")
@@ -559,7 +1145,7 @@ Single=data %>%
   filter(RequestType=="Single Streetlight Issue"&region !="Other")
 
 LA+
-  stat_density2d(data=Graffiti,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  stat_density2d(data=Single,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
   scale_fill_manual(values=col_values)+
   scale_alpha(guide=F)+
   ggtitle("Single Streetlight Issue Requested Density by Region")
@@ -600,9 +1186,9 @@ theme(
     legend.key.size = unit(1.8,"lines")
     )
 ###################
-LA +
+LA1 +
 stat_density2d(aes(x = Longitude, y = Latitude),
-    size = 3, bins = 2, alpha = 3/4, data = data) +
+    size = 3, bins = 2, alpha = 3/4, data = data2) +
 scale_colour_discrete("Services") +
 theme(
     legend.text = element_text(size = 15, vjust = .5),
@@ -611,6 +1197,9 @@ theme(
     )+
   facet_wrap(~RequestType,nrow=3)+
   ggtitle("Services Main Area")
+
+####################
+
 
 ```
 
@@ -623,20 +1212,383 @@ LA+
 
 
 LA+
-  stat_density2d(data=data,aes(x=Longitude, y =Latitude,fill=ProcessHours,alpha=..level..),bins=10,geom="polygon",col="springgreen")+
+  stat_density2d(data=data,aes(x=Longitude, y =Latitude,fill=ProcessHours,alpha=..level..),bins=10,geom="polygon",col="green")+
   scale_alpha(guide=F)+
   ggtitle("Services Processing Time by Region")
 
 
 ```
 
+#Mobile VS Average Processing Hours
+```{r}
+mobile=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & RequestSource =="Mobile App")%>%
+  filter(MobileOS!="")%>%
+  group_by(MobileOS)%>% #,RequestType
+  summarise(avg = mean(ProcessHours)) 
+
+ggplot(mobile,aes(x = MobileOS, y = avg))+
+  geom_bar(stat = "identity")+
+  ggtitle("Mobile OS Average Processing Hours for all service")+
+  ylab("Hours")
+```
+
+#Mobile VS Processing Hours Boxplot
+```{r}
+mobile=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & RequestSource =="Mobile App")%>%
+  filter(MobileOS!="")%>%
+  group_by(MobileOS)%>%
+  filter(ProcessHours<=1000)
+
+#summary(mobile$ProcessHours)
+#glimpse(mobile$ProcessHours)
+
+ggplot(mobile,aes(x = MobileOS, y = ProcessHours))+
+  geom_boxplot()+
+  ggtitle("Mobile OS VS Processing Hours of each case")+
+  ylab("Hours")
+```
+
+#Mobile VS Processing Hours Boxplot (without outliers >1000)
+```{r}
+mobile1=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & RequestSource =="Mobile App")%>%
+  filter(MobileOS!="")%>%
+  group_by(MobileOS)%>%
+  filter(ProcessHours<=1000)
+
+#summary(mobile$ProcessHours)
+#glimpse(mobile$ProcessHours)
+
+ggplot(mobile1,aes(x = MobileOS, y = ProcessHours))+
+  geom_boxplot()+
+  ggtitle("Mobile OS VS Processing Hours of Each case (<1000 Hrs)")+
+  ylab("Hours")
+```
+
+#Mobile VS Processing Hours Boxplot (without outliers >100)
+```{r}
+mobile2=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & RequestSource =="Mobile App")%>%
+  filter(MobileOS!="")%>%
+  group_by(MobileOS)%>%
+  filter(ProcessHours<=100)
+
+#summary(mobile$ProcessHours)
+#glimpse(mobile$ProcessHours)
+
+ggplot(mobile2,aes(x = MobileOS, y = ProcessHours))+
+  geom_boxplot()+
+  ggtitle("Mobile OS VS Processing Hours of Each case (<100 Hrs)")+
+  ylab("Hours")
+```
+
+#Processing Hours for each Service breakdown by Mobile OS
+```{r}
+mobile3=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & RequestSource =="Mobile App")%>%
+  filter(MobileOS!="")%>%
+  group_by(MobileOS,RequestType)%>%
+  summarise(avghrs = round(mean(ProcessHours),2))
+
+ggplot(mobile3, aes(x= reorder(RequestType,-avghrs), y = avghrs, fill = MobileOS))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values = c("lightgreen","darkgreen"))+
+  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))+
+  #geom_text(aes(label = as.integer(avghrs)),vjust=0.1)+
+  ggtitle("MobileOS VS Avg Processing Hours")+
+  ylab("Hours")+
+  xlab("")
+```
+
+#Processing Hours for each Service breakdown by Mobile VS CALL
+```{r}
+mobile_call=data %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed" & RequestSource %in% c("Mobile App","Call"))%>%
+  group_by(RequestSource,RequestType)%>%
+  summarise(avghrs = round(mean(ProcessHours),2))
+
+ggplot(mobile_call, aes(x= reorder(RequestType,-avghrs), y = scale(avghrs), fill = RequestSource))+
+  geom_bar(position = position_dodge(0.9), stat = "Identity") +
+  scale_fill_manual(values = c("lightblue","cornflowerblue"))+
+  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"))+
+  #geom_text(aes(label = as.integer(avghrs)),vjust=0.1)+
+  ggtitle("Mobile VS Call (Avg Processing Hours)")+
+  ylab("Standardized Hours")+
+  xlab("")
+```
+
+
+#Bulky Items
+```{r}
+Bulky=data %>%
+  filter(RequestType=="Bulky Items"&region !="Other")
+
+BulkyBSSBOS=
+  Bulky%>%
+  filter(Owner %in% c("BOS","BSS"))%>%
+  group_by(Owner)%>%
+  summarise(count=n())%>%
+  ggplot(aes(x=Owner,y=(count/1000)))+
+  geom_bar(stat ="identity", fill="cornflowerblue") +
+  ylab("Frequency")+
+  ggtitle("Total Bulky Items (Thousands)")+
+  theme_classic()+
+  geom_text(aes(label = count), size=5,vjust = 0.2)
+  
+
+LA1+
+  stat_density2d(data=Bulky,
+                 aes(x=Longitude,
+                     y =Latitude,
+                     fill=ProcessHours,
+                     alpha=..level..),
+                 bins=10,geom="polygon",col="lightblue3")+
+  ggtitle("Bulky Items Processing Time")+
+  facet_wrap(~month)
+
+
+data2=data %>% filter(RequestType != "Other" &RequestType != "Feedback"&RequestType != "Single Streetlight Issue")
+
+LA1+
+  stat_density2d(data=data2,
+                 aes(x=Longitude,
+                     y =Latitude,
+                     fill=ProcessHours,
+                     alpha=..level..),
+                 bins=10,geom="polygon",col="darkblue")+
+  ggtitle("Processing Time")+
+  facet_wrap(~RequestType)
 
 
 
+###########
+LA1 +
+stat_density2d(aes(x = Longitude, y = Latitude),
+    size = 3, bins = 2, alpha = 3/4, data = Bulky,) +
+scale_colour_discrete("Services") +
+theme(
+    legend.text = element_text(size = 15, vjust = .5),
+    legend.title = element_text(size = 15,face="bold"),
+    legend.key.size = unit(1.8,"lines")
+    )+
+  ggtitle("Main Area of Bulky Item Requested")
 
+LA1+
+  stat_density2d(data=Bulky,aes(x=Longitude, y =Latitude,fill=..level..),bins=10,geom="polygon")+
+  scale_fill_gradient2(low="slategray2",high="navy")+
+  ggtitle("Bulky Item Density Distribution")+
+  facet_wrap(~month)
+
+##### Bulky August & September
+Bulky8.9=data %>%
+  filter(RequestType=="Bulky Items"& region !="Other")%>%
+  mutate(month=month(CreatedDate))%>%
+  filter(month %in% c("8","9"))
+
+LA1 = qmap("Los Angeles", zoom = 10, maptype = "roadmap", color="bw")
+LA2 = qmap("Los Angeles", zoom = 12, maptype = "roadmap", color="bw")
+
+LA1+
+  stat_density2d(data=Bulky8.9,aes(x=Longitude, y =Latitude,fill=..level..),bins=10,geom="polygon",col="lightblue3")+
+  scale_fill_gradient2(low="cornflowerblue",high="navy")+
+  ggtitle("Bulky Item Distribution for August and September")
+
+##### Bulky August
+Bulky8=data %>%
+  filter(RequestType=="Bulky Items"& region !="Other")%>%
+  mutate(month=month(CreatedDate))%>%
+  filter(month=="8")
+
+LA1 = qmap("Los Angeles", zoom = 10, maptype = "roadmap", color="bw")
+
+LA1+
+  stat_density2d(data=Bulky8,aes(x=Longitude, y =Latitude,fill=..level..),bins=10,geom="polygon",col="peru")+
+  scale_fill_gradient2(low="cornflowerblue",high="tomato")+
+  ggtitle("Bulky Item Density Distribution (August)")
+
+LA1+
+  stat_density2d(data=Bulky,aes(x=Longitude, y =Latitude,fill=..level..),bins=10,geom="polygon",col="peru")+
+  scale_fill_gradient2(low="cornflowerblue",high="tomato")+
+  ggtitle("Bulky Item Density Distribution")
+
+##### Bulky September
+Bulky9=data %>%
+  filter(RequestType=="Bulky Items"& region !="Other")%>%
+  mutate(month=month(CreatedDate))%>%
+  filter(month=="9")
+
+LA1 = qmap("Los Angeles", zoom = 10, maptype = "roadmap", color="bw")
+
+LA1+
+  stat_density2d(data=Bulky9,aes(x=Longitude, y =Latitude,fill=..level..),bins=10,geom="polygon",col="peru")+
+  scale_fill_gradient2(low="cornflowerblue",high="tomato")+
+  ggtitle("Bulky Item Density Distribution (September)")
+
+
+###########
+Bulky %>%
+  group_by(region) %>%
+  summarise(count=n()) %>%
+  ggplot(aes(x=region, y = count,fill=region))+
+  geom_bar(stat="identity")+
+  guides(fill=F)+
+  ggtitle("Bulky Items Frequency by Regions") +
+  ylab("frequency")+
+  xlab("")+
+  scale_fill_manual(values=col_values)
+###########
+Bulky %>%
+  group_by(region) %>%
+  summarise(avg=mean(ProcessHours)) %>%
+  ggplot(aes(x=region, y = avg,fill=region))+
+  geom_bar(stat="identity")+
+  guides(fill=F)+
+  ggtitle("Bulky Items Average Processing Time by Regions") +
+  ylab("hours")+
+  xlab("") +
+  scale_fill_manual(values=col_values)
 
 
 ```
 
 
+#Homeless 
+```{r}
+Homeless=data %>%
+  filter(RequestType=="Homeless Encampment"&region !="Other")
+
+LA+
+  stat_density2d(data=Homeless,aes(x=Longitude, y =Latitude,fill=ProcessHours,alpha=..level..),bins=10,geom="polygon",col="lightcoral")+
+  ggtitle("Homeless Encampment Processing Time")
+################
+LA +
+stat_density2d(aes(x = Longitude, y = Latitude),
+    size = 3, bins = 2, alpha = 3/4, data = Homeless) +
+scale_colour_discrete("Services") +
+theme(
+    legend.text = element_text(size = 15, vjust = .5),
+    legend.title = element_text(size = 15,face="bold"),
+    legend.key.size = unit(1.8,"lines")
+    )+
+  ggtitle("Main Area of Homeless Encampment Requested")
+
+
+LA+
+  stat_density2d(data=Homeless,aes(x=Longitude, y =Latitude,fill=..level..),bins=10,geom="polygon",col="lightcoral")+
+  scale_fill_gradient2(low="pink",high="coral")+
+  ggtitle("Homeless Encampment Distribution")
+
+###########
+LA+
+  stat_density2d(data=Homeless,aes(x=Longitude, y =Latitude,fill=region,alpha=..level..),bins=10,geom="polygon")+
+  scale_fill_manual(values=col_values)+
+  scale_alpha(guide=F)+
+  ggtitle("Homeless Encampment Requested Density by Region")
+
+##############
+Homeless %>%
+  group_by(region) %>%
+  summarise(count=n()) %>%
+  ggplot(aes(x=region, y = count,fill=region))+
+  geom_bar(stat="identity")+
+  guides(fill=F)+
+  ggtitle("Homeless Encampment Frequency by Regions") +
+  ylab("frequency")+
+  xlab("")+
+  scale_fill_manual(values=col_values)
+#################
+Homeless %>%
+  group_by(region) %>%
+  summarise(avg=mean(ProcessHours)) %>%
+  ggplot(aes(x=region, y = avg,fill=region))+
+  geom_bar(stat="identity")+
+  guides(fill=F)+
+  ggtitle("Homeless Encampment Average Processing Time by Regions") +
+  ylab("hours")+
+  xlab("")+
+  scale_fill_manual(values=col_values)
+```
+
+#2 graphs-Distribution of Services VS Processing Time Lacy Lulu
+```{r}
+
+process_time_bulky = Bulky %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+  group_by(month)%>%
+  summarise(avg = mean(ProcessHours),
+            count=n())%>%
+  mutate(effi=(as.integer(avg)/count))
+  
+ p11 =  ggplot(process_time_bulky,aes(x = month, y = avg,group = 1))+
+  geom_line() +
+  geom_text(aes(label = as.integer(avg)),hjust =-0.6,vjust=0.9)+
+  theme(axis.text.x=element_blank())+
+  ylab("Average Processing Time ")+
+   xlab("") +
+   geom_point(size =1)
+ 
+ p12 =  ggplot(process_time_bulky,aes(x = month, y = count,group = 1))+
+  geom_line() +
+  geom_text(aes(label = as.integer(count)),hjust =-0.6,vjust=0.9)+
+  theme(axis.text.x=element_text())+
+  ylab("Frequency")+
+   xlab("") +
+   geom_point(size =1)
+ 
+  p13 =  ggplot(process_time_bulky,aes(x = month, y = effi,group = 1))+
+  geom_line() +
+  #geom_text(aes(label = as.integer(count)),hjust =-0.6,vjust=0.9)+
+  theme(axis.text.x=element_text())+
+  ylab("Efficiency")+
+   xlab("") +
+    ggtitle("#Task per hour")+
+   geom_point(size =1)
+
+
+library(gridExtra)
+grid.arrange(p12,p11,p13, ncol = 1,
+             top = "Bulky Items ") 
+
+```
+
+
+
+```{r}
+
+process_time_bulky = Homeless %>%
+  filter(ActionTaken == "SR Created"& Status =="Closed") %>%
+  group_by(month)%>%
+  summarise(avg = mean(ProcessHours),
+            count=n())%>%
+  mutate(effi=(count/as.integer(avg)))
+  
+ p11 =  ggplot(process_time_bulky,aes(x = month, y = avg,group = 1))+
+  geom_line() +
+  geom_text(aes(label = as.integer(avg)),hjust =-0.6,vjust=0.9)+
+  theme(axis.text.x=element_blank())+
+  ylab("Average Processing Time ")+
+   xlab("") +
+   geom_point(size =1)
+ 
+ p12 =  ggplot(process_time_bulky,aes(x = month, y = count,group = 1))+
+  geom_line() +
+  geom_text(aes(label = as.integer(count)),hjust =-0.6,vjust=0.9)+
+  theme(axis.text.x=element_text())+
+  ylab("Frequency")+
+   xlab("") +
+   geom_point(size =1)
+ 
+
+grid.arrange(p12,p11,p13, ncol = 1,
+             top = "Bulky Items ") 
+
+```
 
