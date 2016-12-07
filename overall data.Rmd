@@ -14,11 +14,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 data=read.csv("MyLA311_Service_Request_Data_2016.csv")
 
+
 library(dplyr)
 library(ggplot2)
 library(ggmap)
 library(lubridate)
 library(gridExtra)
+
+str(data)
+levels(data$PolicePrecinct)
 
 data$CreatedDate=mdy_hm(data$CreatedDate)
 data$UpdatedDate=mdy_hm(data$UpdatedDate)
@@ -76,33 +80,29 @@ p1 = ggplot(service_type,aes(x=reorder(RequestType, -frequency), y= frequency/10
     labels = seq(0,600,100),
                      breaks = seq(0,600,100)) +
   ylab("Frequency") +
-  geom_text(aes(label = frequency/1000), vjust = -0.2) +
+  geom_text(aes(label = frequency), vjust = -0.2) +
   scale_fill_manual(values = c("cornflowerblue","indianred1"), guide =F)+
   theme(axis.text.x=element_text(angle = 25,vjust =1 ,hjust=1),
     panel.grid.major = element_line(colour = "white"),
     panel.grid.minor = element_line(color = "white"),
     panel.background = element_rect(fill = "white"),
     legend.position = "bottom")+
-  xlab("")+
-  ggtitle("Frequency by Service Type")
+  xlab("")
+  
 
-
-lev =levels(process_time$RequestType)
-lev=lev[c(1,5,8,7,3,2,12,6,10,9,11,4)]
-process_time$RequestType=factor(process_time$RequestType, levels =lev)
-
+process_time$RequestType=factor(process_time$RequestType, levels =c("Bulky Items","Graffiti Removal","Metal/Household Appliances","Illegal Dumping Pickup","Electronic Waste","Dead Animal Removal","Homeless Encampment","Single Streetlight Issue","Other","Multiple Streetlight Issue","Report Water Waste","Feedback"))
 
  p2 =  ggplot(process_time,aes(x = RequestType, y = avg,group = 1))+
   geom_line() +
-  geom_text(aes(label = as.integer(avg)),hjust =-0.6,vjust=0.9)+
+  geom_text(aes(label = as.integer(avg)),vjust=0.9,hjust=-0.1)+
   theme(axis.text.x=element_blank())+
-  ylab("Average Processing Time (hours)")+
+  ylab("Hours")+
    xlab("") +
    geom_point(size =1)
 
 library(gridExtra)
 grid.arrange(p2,p1, nrow = 2,
-             top = "Services Type Frequency(thousands) vs. Processing Time(hours)") 
+             top = "Services Type Frequency vs. Average Processing Hours") 
 
 ```
 
@@ -286,14 +286,14 @@ filter(RequestType!="Report Water Waste" & RequestType!="Feedback" & RequestType
 ggplot(aes(x= reorder(RequestType,-avg), y =avg, fill = Owner))+
   geom_bar(position = position_dodge(0.9), stat = "Identity") +
   scale_fill_manual(values =c("tomato","rosybrown1","gold1","darkolivegreen2","darkblue","darkgreen","aquamarine3","cornflowerblue","black","mediumpurple2","gainsboro","chocolate4"))+
-  theme(axis.text.x=element_text(angle = -25,vjust = ,hjust=0.00001),
+  theme(axis.text.x=element_text(angle = 25,vjust =1 ,hjust=1),
     panel.grid.major = element_line(colour = "white"),
     panel.grid.minor = element_line(color = "white"),
     panel.background = element_rect(fill = "white"),
     legend.position = "bottom")+
     xlab("")+
     ylab("Hours")+
-    ggtitle("Department VS Request (Average Processing Hours)")
+    ggtitle("Average Processing Hours (Service Type by Department)")
 
 efi_all_std=
   depart_time2%>%
@@ -648,11 +648,15 @@ subset1 =data %>%
 
 ggplot(subset1, aes(x= RequestType, y = frequency/1000, fill = RequestSource))+
   geom_bar(position = position_dodge(0.9), stat = "Identity") +
-  theme(axis.text.x=element_text(angle = 15,vjust = 1, hjust=1))+
+  theme(axis.text.x=element_text(angle = 15,vjust = 1,hjust=1),
+    panel.grid.major = element_line(colour = "white"),
+    panel.grid.minor = element_line(color = "white"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "right")+
   ggtitle("Top5 Seriveces by Top5 Request Sources")+
   ylab("Frequency")+
-  xlab("")+
-  theme_classic()
+  xlab("")
+ 
 ```
 
 
@@ -1329,7 +1333,7 @@ ggplot(mobile_call, aes(x= reorder(RequestType,-avghrs), y = scale(avghrs), fill
 #Bulky Items
 ```{r}
 Bulky=data %>%
-  filter(RequestType=="Bulky Items"&region !="Other")
+  filter(RequestType=="Bulky Items"& region !="Other")
 
 BulkyBSSBOS=
   Bulky%>%
@@ -1358,13 +1362,13 @@ LA1+
 data2=data %>% filter(RequestType != "Other" &RequestType != "Feedback"&RequestType != "Single Streetlight Issue")
 
 LA1+
-  stat_density2d(data=data2,
+  stat_density2d(data=Bulky,
                  aes(x=Longitude,
                      y =Latitude,
                      fill=ProcessHours,
                      alpha=..level..),
                  bins=10,geom="polygon",col="darkblue")+
-  ggtitle("Processing Time")+
+  ggtitle("Processing Time For Bulky Items")+
   facet_wrap(~RequestType)
 
 
@@ -1392,7 +1396,7 @@ Bulky8.9=data %>%
   filter(RequestType=="Bulky Items"& region !="Other")%>%
   mutate(month=month(CreatedDate))%>%
   filter(month %in% c("8","9"))
-
+library(qmap)
 LA1 = qmap("Los Angeles", zoom = 10, maptype = "roadmap", color="bw")
 LA2 = qmap("Los Angeles", zoom = 12, maptype = "roadmap", color="bw")
 
